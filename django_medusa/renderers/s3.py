@@ -1,11 +1,9 @@
-from __future__ import print_function
-try:
-    import cStringIO
-except ImportError:  # >=Python 3.
-    from io import StringIO as cStringIO
 from datetime import timedelta, datetime
+from io import BytesIO
+
 from django.conf import settings
 from django.test.client import Client
+
 from .base import BaseStaticSiteRenderer
 
 __all__ = ('S3StaticSiteRenderer', )
@@ -78,7 +76,7 @@ def _s3_render_path(args):
     key = bucket.get_key(outpath) or bucket.new_key(outpath)
     key.content_type = resp['Content-Type']
 
-    temp_file = cStringIO.StringIO(resp.content)
+    temp_file = BytesIO(resp.content)
     md5 = key.compute_md5(temp_file)
 
     # If key is new, there's no etag yet
@@ -107,10 +105,15 @@ def _s3_render_path(args):
 
 class S3StaticSiteRenderer(BaseStaticSiteRenderer):
     """
+    DEPRECATED and unsupported: this backend targets the legacy `boto`
+    (not `boto3`) AWS SDK and is retained only for import compatibility.
+    Use DiskStaticSiteRenderer and sync the output with a supported AWS
+    tool instead.
+
     A variation of BaseStaticSiteRenderer that deploys directly to S3
     rather than to the local filesystem.
 
-    Requires `boto`.
+    Requires the legacy `boto` package.
 
     Uses some of the same settings as `django-storages`:
       * AWS_ACCESS_KEY

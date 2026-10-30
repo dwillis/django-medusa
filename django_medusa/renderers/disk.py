@@ -1,9 +1,9 @@
-from __future__ import print_function
-from django.conf import settings
-from django.test.client import Client
 import mimetypes
 import os
-from .base import COMMON_MIME_MAPS, BaseStaticSiteRenderer
+
+from django.conf import settings
+
+from .base import COMMON_MIME_MAPS, BaseStaticSiteRenderer, get_test_client
 
 __all__ = ('DiskStaticSiteRenderer', )
 
@@ -14,29 +14,28 @@ __all__ = ('DiskStaticSiteRenderer', )
 def _disk_render_path(args):
     client, path, view = args
     if not client:
-        client = Client()
+        client = get_test_client()
     if path:
         DEPLOY_DIR = settings.MEDUSA_DEPLOY_DIR
         realpath = path
         if path.startswith("/"):
             realpath = realpath[1:]
 
-        if path.endswith("/"):
-            needs_ext = True
-        else:
-            needs_ext = False
+        needs_ext = path.endswith("/")
 
         output_dir = os.path.abspath(os.path.join(
             DEPLOY_DIR,
             os.path.dirname(realpath)
         ))
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
         outpath = os.path.join(DEPLOY_DIR, realpath)
 
         resp = client.get(path)
         if resp.status_code != 200:
-            raise Exception
+            raise Exception(
+                "Rendering '%s' returned HTTP status %s"
+                % (path, resp.status_code)
+            )
         if needs_ext:
             mime = resp['Content-Type']
             mime = mime.split(';', 1)[0]
@@ -63,21 +62,31 @@ class DiskStaticSiteRenderer(BaseStaticSiteRenderer):
 
     def generate(self):
         if getattr(settings, "MEDUSA_MULTITHREAD", False):
-            # Upload up to ten items at once via `multiprocessing`.
-            from multiprocessing import Pool, cpu_count
+            from multiprocessing import (
+                Pool, cpu_count, get_all_start_methods, get_context,
+            )
 
             print("Generating with up to %d processes..." % cpu_count())
-            pool = Pool(cpu_count())
-
-            pool.map_async(
-                _disk_render_path,
-                ((None, path, None) for path in self.paths),
-                chunksize=5
-            )
-            pool.close()
-            pool.join()
+            # Workers render through the Django test client, so they must
+            # inherit the parent's configured Django state. Python 3.14
+            # stopped defaulting to "fork", so request it explicitly and
+            # fall back to the platform default where it is unavailable
+            # (e.g. Windows, where MEDUSA_MULTITHREAD is best-effort).
+            if 'fork' in get_all_start_methods():
+                pool = get_context('fork').Pool(cpu_count())
+            else:
+                pool = Pool(cpu_count())
+            with pool:
+                # pool.map raises here if any worker failed, so rendering
+                # errors propagate to the management command instead of
+                # being silently dropped.
+                pool.map(
+                    _disk_render_path,
+                    ((None, path, None) for path in self.paths),
+                    chunksize=5
+                )
         else:
             # Use standard, serial upload.
-            self.client = Client()
+            self.client = get_test_client()
             for path in self.paths:
                 self.render_path(path=path)

@@ -1,8 +1,8 @@
-from __future__ import print_function
-import imp
+import importlib
+import importlib.util
+
+from django.apps import apps
 from django.conf import settings
-from importlib import import_module
-import sys
 
 
 def get_static_renderers():
@@ -19,38 +19,36 @@ def get_static_renderers():
             # strip off '.settings" from end of module
             # (want project module, if possible)
             settings_module = settings_module.split(".", 1)[0]
-        modules_to_check += [settings_module, ]
+        modules_to_check.append(settings_module)
 
-    # INSTALLED_APPS that aren't the project itself (also ignoring this
-    # django_medusa module)
-    modules_to_check += filter(
-        lambda x: (x != "django_medusa") and (x != settings_module),
-        settings.INSTALLED_APPS
-    )
+    # INSTALLED_APPS via the app registry (handles AppConfig entries),
+    # ignoring the project itself and this django_medusa module.
+    modules_to_check += [
+        app_config.name
+        for app_config in apps.get_app_configs()
+        if app_config.name not in ("django_medusa", settings_module)
+    ]
 
-    for app in modules_to_check:
+    for app in dict.fromkeys(modules_to_check):
         try:
-            import_module(app)
-            app_path = sys.modules[app].__path__
-        except AttributeError:
+            module = importlib.import_module(app)
+        except ImportError:
             print("Skipping app '%s'... (Not found)" % app)
             continue
-        try:
-            imp.find_module(module_name, app_path)
-        except ImportError:
+        if getattr(module, '__path__', None) is None:
+            print("Skipping app '%s'... (Not a package)" % app)
+            continue
+        if importlib.util.find_spec('%s.%s' % (app, module_name)) is None:
             print("Skipping app '%s'... (No 'renderers.py')" % app)
             continue
-        try:
-            app_render_module = import_module('%s.%s' % (app, module_name))
-            if hasattr(app_render_module, "renderers"):
-                renderers += getattr(app_render_module, module_name)
-            else:
-                print("Skipping app '%s'... ('%s.renderers' does not contain "\
-                      "'renderers' var (list of render classes)" % (app, app))
-        except AttributeError:
-            print("Skipping app '%s'... (Error importing '%s.renderers')" % (
-                app, app
-            ))
+        # Any error raised while importing an existing renderers module
+        # propagates to the caller rather than being silently skipped.
+        app_render_module = importlib.import_module('%s.%s' % (app, module_name))
+        app_renderers = getattr(app_render_module, 'renderers', None)
+        if app_renderers is None:
+            print("Skipping app '%s'... ('%s.renderers' does not contain "
+                  "'renderers' var (list of render classes)" % (app, app))
             continue
-        print ("Found renderers for '%s'..." % app)
+        renderers += app_renderers
+        print("Found renderers for '%s'..." % app)
     return tuple(renderers)

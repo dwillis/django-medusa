@@ -1,8 +1,9 @@
-from __future__ import print_function
+import os
+
 from django.conf import settings
 from django.test.client import Client
+
 from .base import BaseStaticSiteRenderer
-import os
 
 __all__ = ('GAEStaticSiteRenderer', )
 
@@ -48,7 +49,7 @@ def _gae_render_path(args):
             outpath += "index.html"
 
         print(outpath)
-        with open(outpath, 'w') as f:
+        with open(outpath, 'wb') as f:
             f.write(resp.content)
 
         rel_outpath = outpath.replace(
@@ -71,8 +72,12 @@ def _gae_render_path(args):
 
 class GAEStaticSiteRenderer(BaseStaticSiteRenderer):
     """
-    A variation of BaseStaticSiteRenderer that deploys directly to S3
-    rather than to the local filesystem.
+    DEPRECATED and unsupported: this backend targets the legacy (Python 2)
+    Google App Engine SDK and is retained only for import compatibility.
+    Use DiskStaticSiteRenderer and deploy the output yourself instead.
+
+    A variation of BaseStaticSiteRenderer that writes the site to disk
+    along with a legacy App Engine `app.yaml`.
 
     Settings:
       * GAE_APP_ID
@@ -133,10 +138,10 @@ class GAEStaticSiteRenderer(BaseStaticSiteRenderer):
             "####################\n\n"
         )
 
-        for num_bits in xrange(10):
+        for num_bits in range(10):
             path_parts = "(.*)/" * num_bits
             counter_part = ""
-            for c in xrange(0, num_bits):
+            for c in range(0, num_bits):
                 counter_part += "\\%s/" % (c + 1)
 
             app_yaml_f.write(

@@ -6,7 +6,8 @@ A super simple "static site generator" for Django sites. [Read more about this p
 
 ---
 
-**Note**: This project is largely unmaintained since 2014 and may be broken. If you
+**Note**: The current development version targets Python 3.12+ and Django 6.1
+(disk renderer). The S3 and App Engine backends are deprecated. If you
 want to use something similar that's gotten more love lately, look at the following
 which are still somewhat active, as of January 2016:
 
@@ -39,6 +40,14 @@ views in parallel.
 in the `docs` dir:
 
 * [Tutorial 1: Hello World](https://github.com/mtigas/django-medusa/blob/master/docs/TUTORIAL-01.markdown)
+
+## Requirements
+
+* Python 3.12, 3.13, or 3.14
+* Django 6.1
+* The disk-based renderer (`DiskStaticSiteRenderer`) is the supported backend.
+  The S3 and App Engine backends are deprecated and retained only for import
+  compatibility.
 
 ## Renderer classes
 
@@ -81,7 +90,7 @@ Or even:
 
     from django_medusa.renderers import StaticSiteRenderer
     from myproject.blog.models import BlogPost
-    from django.core.urlresolvers import reverse
+    from django.urls import reverse
 
 
     class BlogPostsRenderer(StaticSiteRenderer):
@@ -131,6 +140,10 @@ Example settings:
 
 ### S3-based site renderer
 
+**Deprecated:** this backend targets the legacy `boto` SDK (not `boto3`) and is
+retained only for import compatibility. Prefer rendering to disk and syncing
+the output with a supported AWS tool.
+
 Example settings:
 
     INSTALLED_APPS = (
@@ -158,6 +171,10 @@ the file will be uploaded to "/foo/json/index.html" but will be served as
 application/json in the browser -- and will be accessible from "/foo/json/".
 
 ### App Engine-based site renderer
+
+**Deprecated:** this backend targets the legacy (Python 2) App Engine SDK and
+is retained only for import compatibility. Prefer rendering to disk and
+deploying the output yourself.
 
 Example settings:
 
@@ -187,20 +204,20 @@ header will be manually defined for this URL in the `app.yaml` path.
 
 ## Usage
 
-1. Install `django-medusa` into your python path (TODO: setup.py) and add
+1. Install `django-medusa` (`pip install django-medusa`) and add
    `django_medusa` to `INSTALLED_APPS`.
-2. Select a renderer backend (currently: disk or s3) in your settings.
-2. Create renderer classes in `renderers.py` under the apps you want to render.
-3. `django-admin.py staticsitegen`
-4. ???
-5. Profit!
+2. Select a renderer backend (supported: disk) in your settings.
+3. Create renderer classes in `renderers.py` under the apps you want to render.
+4. `django-admin staticsitegen` (or `python manage.py staticsitegen`)
+5. ???
+6. Profit!
 
 #### Example
 
 From the first example in the "**Renderer classes**" section, using the
 disk-based backend.
 
-    $ django-admin.py staticsitegen
+    $ django-admin staticsitegen
     Found renderers for 'myproject'...
     Skipping app 'django.contrib.syndication'... (No 'renderers.py')
     Skipping app 'django.contrib.sitemaps'... (No 'renderers.py')
@@ -210,3 +227,62 @@ disk-based backend.
     /project_dir/var/html/index.html
     /project_dir/var/html/about/index.html
     /project_dir/var/html/sitemap.xml
+
+## Local preview and publishing to GitHub Pages
+
+The disk renderer mirrors your URL structure to files (`/about/` becomes
+`about/index.html`), so the output is directly servable by any static host,
+including GitHub Pages.
+
+1. Build into a clean output directory:
+   `python manage.py staticsitegen`
+2. Collect static assets into the same directory by setting `STATIC_URL` to
+   `'/static/'` and `STATIC_ROOT` to a `static` subdirectory of
+   `MEDUSA_DEPLOY_DIR`, then run `python manage.py collectstatic --noinput`.
+3. Preview the result exactly as it will be served:
+   `python -m http.server --directory path/to/output 8000`
+4. Deploy with GitHub Actions. In the **site's** repository, set the Pages
+   source to "GitHub Actions" and add a workflow like:
+
+       name: Publish
+       on: [push, workflow_dispatch]
+       permissions:
+         contents: read
+         pages: write
+         id-token: write
+       jobs:
+         build:
+           runs-on: ubuntu-latest
+           steps:
+             - uses: actions/checkout@v4
+             - uses: actions/setup-python@v5
+               with:
+                 python-version: '3.12'
+             - run: pip install -r requirements.txt
+             - run: python manage.py staticsitegen
+             - run: python manage.py collectstatic --noinput
+             - uses: actions/upload-pages-artifact@v3
+               with:
+                 path: path/to/output
+         deploy:
+           needs: build
+           runs-on: ubuntu-latest
+           environment:
+             name: github-pages
+             url: ${{ steps.deployment.outputs.page_url }}
+           steps:
+             - id: deployment
+               uses: actions/deploy-pages@v4
+
+Things to be aware of:
+
+* Django views, models, and forms run at **build time** only; the published
+  site is static files. Anything per-request (auth, server-side forms,
+  search) will not work after publishing.
+* For a user/organization site (`USER.github.io`) or a custom domain,
+  root-relative URLs work as-is. For a project site
+  (`USER.github.io/REPOSITORY/`), prefix your URLs with the repository name.
+* Give non-HTML output explicit file extensions. GitHub Pages picks the
+  `Content-Type` from the file extension, not from the response headers your
+  views returned at build time.
+* Add a `404.html` to your renderer paths if you want a custom error page.

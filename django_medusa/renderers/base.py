@@ -1,4 +1,20 @@
-__all__ = ['COMMON_MIME_MAPS', 'BaseStaticSiteRenderer']
+__all__ = ['COMMON_MIME_MAPS', 'BaseStaticSiteRenderer', 'get_test_client']
+
+
+def get_test_client():
+    """
+    Return a Django test Client suitable for rendering views outside of a
+    test run. Django only whitelists the test client's default host
+    ('testserver') while running tests, so ensure it passes ALLOWED_HOSTS
+    validation when rendering from a management command.
+    """
+    from django.conf import settings
+    from django.test.client import Client
+
+    allowed_hosts = getattr(settings, 'ALLOWED_HOSTS', [])
+    if 'testserver' not in allowed_hosts and '*' not in allowed_hosts:
+        settings.ALLOWED_HOSTS = [*allowed_hosts, 'testserver']
+    return Client()
 
 
 # Since mimetypes.get_extension() gets the "first known" (alphabetically),
