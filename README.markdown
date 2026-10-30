@@ -4,7 +4,7 @@
 
 A super simple "static site generator" for Django sites. [Read more about this project here](https://mike.tig.as/blog/2012/06/30/django-medusa-rendering-django-sites-static-html/).
 
-© 2011-2014 Mike Tigas. Licensed under the [MIT License](LICENSE).
+© 2011-2014 Mike Tigas, © 2026 Derek Willis. Licensed under the [MIT License](LICENSE).
 
 ---
 
