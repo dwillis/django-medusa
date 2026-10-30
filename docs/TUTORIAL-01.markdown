@@ -100,4 +100,4 @@ For more advanced topics (dynamically generating `renderer.get_paths` based
 on models, collecting static assets, publishing, etc), see [the
 README][readme] and stay tuned for future tutorials.
 
-[readme]: https://github.com/mtigas/django-medusa/blob/master/README.markdown
+[readme]: ../README.markdown

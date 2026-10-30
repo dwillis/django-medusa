@@ -1,15 +1,18 @@
 # django-medusa
 
+[![Tests](https://github.com/dwillis/django-medusa/actions/workflows/test.yml/badge.svg)](https://github.com/dwillis/django-medusa/actions/workflows/test.yml)
+
 A super simple "static site generator" for Django sites. [Read more about this project here](https://mike.tig.as/blog/2012/06/30/django-medusa-rendering-django-sites-static-html/).
 
 © 2011-2014 Mike Tigas. Licensed under the [MIT License](LICENSE).
 
 ---
 
-**Note**: The current development version targets Python 3.12+ and Django 6.1
-(disk renderer). The S3 and App Engine backends are deprecated. If you
-want to use something similar that's gotten more love lately, look at the following
-which are still somewhat active, as of January 2016:
+**Note**: This fork is modernized for Python 3.12+ and Django 6.1 as of
+v0.4.0 (disk renderer; the S3 and App Engine backends are deprecated).
+The original project, [mtigas/django-medusa](https://github.com/mtigas/django-medusa),
+has been unmaintained since 2014. If you want to use something similar,
+look at the following which are still somewhat active, as of January 2016:
 
 * [django-bakery](https://github.com/datadesk/django-bakery), built and maintained
   the lovely people at the [Los Angeles Times Data Desk](http://datadesk.latimes.com/).
@@ -28,8 +31,9 @@ existing Django site installation (not relying on highly-dynamic content) can
 be converted into a static generator which mirror's that site's output.
 
 Given a "renderer" that defines a set of URLs (see below), this uses Django's
-built-in `TestClient` to render out those views to either disk, Amazon S3,
-or to Google App Engine.
+built-in `TestClient` to render out those views to static files on disk,
+ready to be served by any static host (e.g. GitHub Pages, Netlify, or an
+`aws s3 sync` upload).
 
 At the moment, this likely does not scale to extremely large websites due to
 the use of the internal `TestClient`. But django-medusa optionally uses the
@@ -39,7 +43,7 @@ views in parallel.
 **For those uninterested in the nitty-gritty**, there are tutorials/examples
 in the `docs` dir:
 
-* [Tutorial 1: Hello World](https://github.com/mtigas/django-medusa/blob/master/docs/TUTORIAL-01.markdown)
+* [Tutorial 1: Hello World](docs/TUTORIAL-01.markdown)
 
 ## Requirements
 
@@ -204,8 +208,10 @@ header will be manually defined for this URL in the `app.yaml` path.
 
 ## Usage
 
-1. Install `django-medusa` (`pip install django-medusa`) and add
-   `django_medusa` to `INSTALLED_APPS`.
+1. Install `django-medusa` from this repository and add `django_medusa`
+   to `INSTALLED_APPS`:
+
+       pip install git+https://github.com/dwillis/django-medusa.git@v0.4.0
 2. Select a renderer backend (supported: disk) in your settings.
 3. Create renderer classes in `renderers.py` under the apps you want to render.
 4. `django-admin staticsitegen` (or `python manage.py staticsitegen`)
